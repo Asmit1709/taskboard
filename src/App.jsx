@@ -4,6 +4,9 @@ export default function App() {
   const [user, setUser] = useState(localStorage.getItem("user"));
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+
   const [tasks, setTasks] = useState(
     JSON.parse(localStorage.getItem("tasks") || "[]")
   );
@@ -12,15 +15,15 @@ export default function App() {
     localStorage.setItem("tasks", JSON.stringify(tasks));
   }, [tasks]);
 
-  // ---------- LOGIN ----------
+  // LOGIN
   const login = () => {
-    const e = email.trim().toLowerCase();
-    const p = pass.trim();
-
-    if (e === "intern@demo.com" && p === "intern123") {
-      setUser(e);
-      localStorage.setItem("user", e);
-    } else alert("Invalid login credentials");
+    if (
+      email.trim().toLowerCase() === "intern@demo.com" &&
+      pass.trim() === "intern123"
+    ) {
+      setUser(email);
+      localStorage.setItem("user", email);
+    } else alert("Invalid login");
   };
 
   const logout = () => {
@@ -28,65 +31,109 @@ export default function App() {
     localStorage.removeItem("user");
   };
 
-  // ---------- TASK FUNCTIONS ----------
+  // ADD TASK
   const addTask = () => {
-    const title = prompt("Enter task title");
+    const title = prompt("Title");
     if (!title) return;
-    setTasks([...tasks, { id: Date.now(), title, col: "todo" }]);
+
+    const description = prompt("Description") || "";
+    const priority = prompt("Priority (low/medium/high)") || "low";
+    const due = prompt("Due date (YYYY-MM-DD)") || "";
+    const tags = prompt("Tags comma separated") || "";
+
+    setTasks([
+      ...tasks,
+      {
+        id: Date.now(),
+        title,
+        description,
+        priority,
+        due,
+        tags,
+        created: new Date().toLocaleString(),
+        col: "todo"
+      }
+    ]);
   };
 
+  // DELETE
+  const del = id => setTasks(tasks.filter(t => t.id !== id));
+
+  // MOVE COLUMN
   const move = (id, col) =>
     setTasks(tasks.map(t => (t.id === id ? { ...t, col } : t)));
 
-  const del = id => setTasks(tasks.filter(t => t.id !== id));
+  // CHANGE PRIORITY
+  const changePriority = (id, p) =>
+    setTasks(tasks.map(t => (t.id === id ? { ...t, priority: p } : t)));
+
+  // EDIT
+  const edit = task => {
+    const title = prompt("Edit title", task.title);
+    if (!title) return;
+
+    const description = prompt("Edit description", task.description);
+    const due = prompt("Edit due", task.due);
+    const tags = prompt("Edit tags", task.tags);
+
+    setTasks(
+      tasks.map(t =>
+        t.id === task.id
+          ? { ...t, title, description, due, tags }
+          : t
+      )
+    );
+  };
+
+  // RESET
+  const resetBoard = () => {
+    if (confirm("Reset all tasks?")) {
+      setTasks([]);
+      localStorage.removeItem("tasks");
+    }
+  };
 
   const cols = ["todo", "doing", "done"];
 
-  // ---------- BUTTON STYLE ----------
-  const btn = color => ({
-    marginRight: 6,
-    padding: "6px 10px",
-    border: "none",
-    borderRadius: 6,
-    background: color,
-    color: "white",
-    cursor: "pointer",
-    fontSize: 12
-  });
+  // SEARCH + FILTER + SORT
+  const filteredTasks = tasks
+    .filter(t => t.title.toLowerCase().includes(search.toLowerCase()))
+    .filter(t => (filter === "all" ? true : t.priority === filter))
+    .sort((a, b) => (a.due || "9999") > (b.due || "9999") ? 1 : -1);
 
-  // ---------- LOGIN PAGE ----------
-  if (!user) {
+  // LOGIN PAGE
+  if (!user)
     return (
       <div style={{ padding: 50 }}>
         <h2>Login</h2>
-
-        <input
-          placeholder="Email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-        />
-        <br /><br />
-
-        <input
-          type="password"
-          placeholder="Password"
-          value={pass}
-          onChange={e => setPass(e.target.value)}
-        />
-        <br /><br />
-
+        <input placeholder="Email" onChange={e => setEmail(e.target.value)} /><br/><br/>
+        <input type="password" placeholder="Password" onChange={e => setPass(e.target.value)} /><br/><br/>
         <button onClick={login}>Login</button>
       </div>
     );
-  }
 
-  // ---------- BOARD ----------
+  // BOARD
   return (
-    <div style={{ padding: 20, fontFamily: "sans-serif" }}>
+    <div style={{ padding: 20 }}>
       <h2>Task Board</h2>
 
-      <button onClick={addTask} style={btn("#3498db")}>Add Task</button>
-      <button onClick={logout} style={btn("#e74c3c")}>Logout</button>
+      <button onClick={addTask}>Add</button>
+      <button onClick={resetBoard}>Reset</button>
+      <button onClick={logout}>Logout</button>
+
+      <br /><br />
+
+      <input
+        placeholder="Search"
+        onChange={e => setSearch(e.target.value)}
+      />
+
+      <select onChange={e => setFilter(e.target.value)}>
+        <option value="all">All</option>
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+      </select>
 
       <div style={{ display: "flex", gap: 20, marginTop: 20 }}>
         {cols.map(col => (
@@ -100,15 +147,13 @@ export default function App() {
             style={{
               width: 260,
               minHeight: 350,
-              padding: 15,
-              border: "2px dashed #ccc",
-              borderRadius: 12,
-              background: "#f9f9f9"
+              border: "2px dashed gray",
+              padding: 10
             }}
           >
-            <h3 style={{ textAlign: "center" }}>{col.toUpperCase()}</h3>
+            <h3>{col.toUpperCase()}</h3>
 
-            {tasks
+            {filteredTasks
               .filter(t => t.col === col)
               .map(t => (
                 <div
@@ -118,22 +163,36 @@ export default function App() {
                     e.dataTransfer.setData("taskId", t.id)
                   }
                   style={{
-                    border: "1px solid #ddd",
-                    padding: 12,
-                    marginBottom: 12,
-                    borderRadius: 10,
-                    background: "#fff",
-                    boxShadow: "0 2px 6px rgba(0,0,0,0.1)"
+                    border: "1px solid gray",
+                    padding: 10,
+                    marginBottom: 10
                   }}
                 >
-                  <b>{t.title}</b>
+                  <b>{t.title}</b><br/>
+                  {t.description}<br/>
+                  Priority: {t.priority}<br/>
+                  Due: {t.due || "none"}<br/>
+                  Tags: {t.tags}<br/>
+                  <small>{t.created}</small>
 
-                  <div style={{ marginTop: 10 }}>
-                    <button onClick={() => move(t.id,"todo")} style={btn("#3498db")}>Todo</button>
-                    <button onClick={() => move(t.id,"doing")} style={btn("#f39c12")}>Doing</button>
-                    <button onClick={() => move(t.id,"done")} style={btn("#2ecc71")}>Done</button>
-                    <button onClick={() => del(t.id)} style={btn("#e74c3c")}>Delete</button>
-                  </div>
+                  <br /><br />
+
+                  {/* COLUMN BUTTONS */}
+                  <button onClick={() => move(t.id,"todo")}>Todo</button>
+                  <button onClick={() => move(t.id,"doing")}>Doing</button>
+                  <button onClick={() => move(t.id,"done")}>Done</button>
+
+                  <br/><br/>
+
+                  {/* PRIORITY BUTTONS */}
+                  <button onClick={() => changePriority(t.id,"low")}>Low</button>
+                  <button onClick={() => changePriority(t.id,"medium")}>Medium</button>
+                  <button onClick={() => changePriority(t.id,"high")}>High</button>
+
+                  <br/><br/>
+
+                  <button onClick={() => edit(t)}>Edit</button>
+                  <button onClick={() => del(t.id)}>Delete</button>
                 </div>
               ))}
           </div>
